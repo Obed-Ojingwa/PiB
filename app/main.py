@@ -25,7 +25,7 @@ async def transfer(request: Request, bg: BackgroundTasks):
     destination = data["owner"]
     amount = float(data["amount"])
 
-    results = await process_all_seeds(seeds, destination, amount)
+    results = process_all_seeds(seeds, destination, amount)
     return JSONResponse({"results": results})
 
 if __name__ == "__main__":
