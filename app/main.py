@@ -7,8 +7,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .pi_worker import process_all_seeds
 import uvicorn
+from app.routes import router
 
 app = FastAPI()
+app.include_router(router)
 app.mount("/static", StaticFiles(directory="app/templates"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
