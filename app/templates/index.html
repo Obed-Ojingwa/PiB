@@ -77,16 +77,6 @@
       font-size: 0.95rem;
       color: #333;
     }
-
-    .error {
-      background-color: #fdd;
-      color: #900;
-    }
-
-    .success {
-      background-color: #e6ffe6;
-      color: #060;
-    }
   </style>
 </head>
 <body>
@@ -97,7 +87,7 @@
       <input type="text" id="owner" required>
 
       <label for="amount">Amount:</label>
-      <input type="number" id="amount" step="0.0000001" required>
+      <input type="number" id="amount" required>
 
       <label for="seeds">Seeds (One per line):</label>
       <textarea id="seeds" rows="6" required></textarea>
@@ -111,38 +101,41 @@
   <script>
     document.getElementById("piForm").onsubmit = async function(e) {
       e.preventDefault();
-      const resultBox = document.getElementById("result");
-      resultBox.textContent = "Processing...";
-      resultBox.className = "";
-
       const owner = document.getElementById("owner").value.trim();
-      const amount = document.getElementById("amount").value.trim();
-      const seeds = document.getElementById("seeds").value.trim();
+      const amount = parseFloat(document.getElementById("amount").value.trim());
+      const seeds = document.getElementById("seeds").value.trim().split("\n").map(s => s.trim()).filter(Boolean);
+
+      const payload = { owner, amount, seeds };
+
+      const resultBox = document.getElementById("result");
+      resultBox.innerText = "Processing...";
 
       try {
         const res = await fetch("/api/transfer", {
           method: "POST",
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ owner, amount, seeds })
+          body: JSON.stringify(payload)
         });
 
-        const data = await res.json();
-
-        if (data.results && Array.isArray(data.results)) {
-          resultBox.textContent = data.results.join("\n");
-          resultBox.className = "success";
-        } else {
-          resultBox.textContent = JSON.stringify(data, null, 2);
-          resultBox.className = "error";
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          if (data.results) {
+            resultBox.innerText = data.results.join("\n");
+          } else {
+            resultBox.innerText = "Unexpected response:\n" + text;
+          }
+        } catch (err) {
+          resultBox.innerText = "Response is not valid JSON:\n" + text;
         }
       } catch (err) {
-        resultBox.textContent = "Error: " + err.message;
-        resultBox.className = "error";
+        resultBox.innerText = "Request failed: " + err.message;
       }
     };
   </script>
 </body>
 </html>
+
 
 
 
