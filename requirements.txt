@@ -8,5 +8,6 @@ stellar-sdk
 bip-utils
 jinja2
 httpx
+pydantic
 
 

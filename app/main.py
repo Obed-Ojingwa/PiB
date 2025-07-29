@@ -18,7 +18,7 @@ class TransferRequest(BaseModel):
 
 app = FastAPI()
 app.include_router(router)
-app.mount("/static", StaticFiles(directory="app/templates"), name="static")
+# app.mount("/static", StaticFiles(directory="app/templates"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 @app.get("/", response_class=HTMLResponse)
