@@ -1,4 +1,199 @@
+
 <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pi Bot Transfer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f2f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background-color: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 500px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin: 1rem 0 0.5rem;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    button {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.75rem;
+      background-color: #4caf50;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .secondary {
+      background-color: #2196f3;
+    }
+
+    .secondary:hover {
+      background-color: #1976d2;
+    }
+
+    .danger {
+      background-color: #f44336;
+    }
+
+    .danger:hover {
+      background-color: #d32f2f;
+    }
+
+    #result {
+      margin-top: 1.5rem;
+      white-space: pre-wrap;
+      background: #eef;
+      padding: 1rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Transfer PI</h1>
+    <form id="piForm">
+      <label for="owner">Owner Address:</label>
+      <input type="text" id="owner" required>
+
+      <label for="amount">Amount:</label>
+      <input type="number" id="amount" required>
+
+      <label for="seeds">Seeds (One per line):</label>
+      <textarea id="seeds" rows="6" required></textarea>
+
+      <button type="submit">Submit Transfer</button>
+    </form>
+
+    <button class="secondary" onclick="startContinuousTransfer()">Start Continuous Transfer</button>
+    <button class="danger" onclick="stopContinuousTransfer()">Stop Transfer</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    document.getElementById("piForm").onsubmit = async function(e) {
+      e.preventDefault();
+      const owner = document.getElementById("owner").value.trim();
+      const amount = parseFloat(document.getElementById("amount").value.trim());
+      const seeds = document.getElementById("seeds").value.trim().split("\n").map(s => s.trim()).filter(Boolean);
+
+      const payload = { owner, amount, seeds };
+
+      const resultBox = document.getElementById("result");
+      resultBox.innerText = "Processing...";
+
+      try {
+        const res = await fetch("/api/transfer", {
+          method: "POST",
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          if (data.results) {
+            resultBox.innerText = data.results.join("\n");
+          } else {
+            resultBox.innerText = "Unexpected response:\n" + text;
+          }
+        } catch (err) {
+          resultBox.innerText = "Response is not valid JSON:\n" + text;
+        }
+      } catch (err) {
+        resultBox.innerText = "Request failed: " + err.message;
+      }
+    };
+
+    async function startContinuousTransfer() {
+      const owner = document.getElementById("owner").value.trim();
+      const amount = parseFloat(document.getElementById("amount").value.trim());
+      const seeds = document.getElementById("seeds").value.trim().split("\n").map(s => s.trim()).filter(Boolean);
+
+      const resultBox = document.getElementById("result");
+      resultBox.innerText = "Starting continuous transfer...";
+
+      try {
+        const res = await fetch("/start", {
+          method: "POST",
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ owner, amount, seeds })
+        });
+
+        const data = await res.json();
+        resultBox.innerText = data.message || "Started continuous transfer.";
+      } catch (err) {
+        resultBox.innerText = "Start failed: " + err.message;
+      }
+    }
+
+    async function stopContinuousTransfer() {
+      const resultBox = document.getElementById("result");
+      resultBox.innerText = "Stopping...";
+
+      try {
+        const res = await fetch("/stop", { method: "POST" });
+        const data = await res.json();
+        resultBox.innerText = data.message || "Stopped.";
+      } catch (err) {
+        resultBox.innerText = "Stop failed: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
+
+
+
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -135,7 +330,7 @@
   </script>
 </body>
 </html>
-
+ -->
 
 
 

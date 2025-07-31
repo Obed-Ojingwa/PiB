@@ -1,4 +1,7 @@
-### File: app/pi_worker.py
+# ### File: app/pi_worker.py
+
+
+# app/pi_worker.py
 
 import asyncio
 import httpx
@@ -13,10 +16,12 @@ server = Server(HORIZON_URL)
 # Adjustable delay in seconds between each batch
 TRANSACTION_DELAY_SECONDS = 0.1
 
+
 async def fetch_account_and_fee(kp: Keypair):
     account = await asyncio.to_thread(server.load_account, kp.public_key)
     base_fee = await asyncio.to_thread(server.fetch_base_fee)
     return account, base_fee
+
 
 async def create_signed_transaction(seed: str, destination: str, amount: float):
     kp = derive_keypair(seed)
@@ -29,9 +34,9 @@ async def create_signed_transaction(seed: str, destination: str, amount: float):
         )
         native_balance = float(native_balance)
 
-        estimated_fee = 0.00001  # Typically the fee per transaction
+        estimated_fee = 0.00001
         if native_balance < amount + estimated_fee + MINIMUM_BALANCE:
-            return kp.public_key, None, f"Insufficient balance ({native_balance}) for amount ({amount}) + fee + reserve"
+            return kp.public_key, None, f"Insufficient balance ({native_balance})"
     except NotFoundError:
         return kp.public_key, None, "Account not found"
     except Exception as e:
@@ -79,7 +84,10 @@ async def process_batch(seeds: list[str], destination: str, amount: float) -> li
     signed_tasks = [create_signed_transaction(seed, destination, amount) for seed in seeds]
     signed_results = await asyncio.gather(*signed_tasks)
 
-    submit_tasks = [submit_transaction(xdr) if xdr else asyncio.sleep(0) for _, xdr, _ in signed_results]
+    submit_tasks = [
+        submit_transaction(xdr) if xdr else asyncio.sleep(0)
+        for _, xdr, _ in signed_results
+    ]
     submit_results = await asyncio.gather(*submit_tasks)
 
     final_results = []
@@ -95,7 +103,7 @@ async def process_all_seeds(seeds: list[str], destination: str, amount: float) -
     start = time.time()
     results = []
 
-    batch_size = 6  # Process 3 transactions per batch for reliability
+    batch_size = 12
     for i in range(0, len(seeds), batch_size):
         batch = seeds[i:i + batch_size]
         try:
@@ -108,6 +116,129 @@ async def process_all_seeds(seeds: list[str], destination: str, amount: float) -
     end = time.time()
     print(f"Processed {len(seeds)} transactions in {round(end - start, 3)}s")
     return results
+
+
+# ✅ Optional: exposed utility for repeated use in /start loop (used by main.py)
+async def loop_process_forever(seeds, destination, amount, stop_event: asyncio.Event):
+    round_counter = 0
+    while not stop_event.is_set():
+        round_counter += 1
+        print(f"🔁 Starting round {round_counter} of transfers")
+        try:
+            await process_all_seeds(seeds, destination, amount)
+        except Exception as e:
+            print(f"[Loop Error] Round {round_counter} failed: {str(e)}")
+        await asyncio.sleep(1.5)  # Delay between rounds
+
+
+# import asyncio
+# import httpx
+# import time
+# from stellar_sdk import Server, TransactionBuilder, Network, Asset, Keypair
+# from stellar_sdk.exceptions import NotFoundError
+# from .config import HORIZON_URL, NETWORK_PASSPHRASE, MINIMUM_BALANCE, FEE_PERCENT
+# from .utils import derive_keypair
+
+# server = Server(HORIZON_URL)
+
+# # Adjustable delay in seconds between each batch
+# TRANSACTION_DELAY_SECONDS = 0.1
+
+# async def fetch_account_and_fee(kp: Keypair):
+#     account = await asyncio.to_thread(server.load_account, kp.public_key)
+#     base_fee = await asyncio.to_thread(server.fetch_base_fee)
+#     return account, base_fee
+
+# async def create_signed_transaction(seed: str, destination: str, amount: float):
+#     kp = derive_keypair(seed)
+
+#     try:
+#         balance_resp = await asyncio.to_thread(server.accounts().account_id(kp.public_key).call)
+#         native_balance = next(
+#             (b["balance"] for b in balance_resp["balances"] if b["asset_type"] == "native"),
+#             "0"
+#         )
+#         native_balance = float(native_balance)
+
+#         estimated_fee = 0.00001  # Typically the fee per transaction
+#         if native_balance < amount + estimated_fee + MINIMUM_BALANCE:
+#             return kp.public_key, None, f"Insufficient balance ({native_balance}) for amount ({amount}) + fee + reserve"
+#     except NotFoundError:
+#         return kp.public_key, None, "Account not found"
+#     except Exception as e:
+#         return kp.public_key, None, f"Error checking balance: {str(e)}"
+
+#     fee_amount = amount * FEE_PERCENT
+#     send_amount = round(amount - fee_amount, 7)
+
+#     try:
+#         account, base_fee = await fetch_account_and_fee(kp)
+#         tx = (
+#             TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee)
+#             .add_text_memo("PI Transfer")
+#             .append_payment_op(destination=destination, asset=Asset.native(), amount=str(send_amount))
+#             .set_timeout(30)
+#             .build()
+#         )
+#         tx.sign(kp)
+#         return kp.public_key, tx.to_xdr(), None
+#     except Exception as e:
+#         return kp.public_key, None, str(e)
+
+
+# async def submit_transaction(xdr: str) -> str:
+#     async with httpx.AsyncClient(timeout=10.0) as client:
+#         try:
+#             response = await client.post(HORIZON_URL + "/transactions", data={"tx": xdr})
+#             try:
+#                 data = response.json()
+#             except Exception as json_error:
+#                 return f"Invalid JSON response: {json_error}"
+
+#             if response.status_code == 200 and 'hash' in data:
+#                 return f"Success: {data['hash']}"
+#             elif response.status_code == 200:
+#                 return f"Success: incomplete response {data}"
+#             else:
+#                 error_detail = data.get("extras", {}).get("result_codes", {})
+#                 return f"Failed: {error_detail}"
+#         except Exception as e:
+#             return f"HTTP Error: {str(e)}"
+
+
+# async def process_batch(seeds: list[str], destination: str, amount: float) -> list[str]:
+#     signed_tasks = [create_signed_transaction(seed, destination, amount) for seed in seeds]
+#     signed_results = await asyncio.gather(*signed_tasks)
+
+#     submit_tasks = [submit_transaction(xdr) if xdr else asyncio.sleep(0) for _, xdr, _ in signed_results]
+#     submit_results = await asyncio.gather(*submit_tasks)
+
+#     final_results = []
+#     for (pubkey, xdr, err), submission in zip(signed_results, submit_results):
+#         if err:
+#             final_results.append(f"Error for {pubkey[:5]}...: {err}")
+#         else:
+#             final_results.append(f"Success for {pubkey[:5]}...: {submission}")
+#     return final_results
+
+
+# async def process_all_seeds(seeds: list[str], destination: str, amount: float) -> list[str]:
+#     start = time.time()
+#     results = []
+
+#     batch_size = 6  # Process 3 transactions per batch for reliability
+#     for i in range(0, len(seeds), batch_size):
+#         batch = seeds[i:i + batch_size]
+#         try:
+#             batch_result = await process_batch(batch, destination, amount)
+#         except Exception as e:
+#             batch_result = [f"Batch {i // batch_size + 1} failed: {str(e)}"]
+#         results.extend(batch_result)
+#         await asyncio.sleep(TRANSACTION_DELAY_SECONDS)
+
+#     end = time.time()
+#     print(f"Processed {len(seeds)} transactions in {round(end - start, 3)}s")
+#     return results
 
 
 
